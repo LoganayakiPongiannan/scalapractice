@@ -1,0 +1,35 @@
+object Streaming extends Serializable {
+
+  import org.apache.spark.sql.SparkSession
+  import org.apache.spark.sql.functions._
+
+  def main(arg: Array[String])={
+
+    val spark = SparkSession.builder()
+      .master("local[3]")
+      .appName("Streaming")
+      .config("spark.sql.shuffle.partitions",3)
+      .getOrCreate()
+
+    val linesDF = spark.readStream
+                    .format("socket")
+      .option("host","localhost")
+      .option("port","9999")
+      .load()
+
+
+    val wordcountDF = linesDF.select(expr("explode(split(value,' ')) as words"))
+    val countDF = wordcountDF.groupBy("words").count()
+
+    val wordQueryCount = countDF.writeStream.format("console").option("checkpointLocation","chk-point-loc").outputMode("complete").start()
+
+    wordQueryCount.awaitTermination()
+
+
+
+
+
+
+  }
+
+}
