@@ -1,0 +1,47 @@
+import org.apache.spark.sql.streaming.Trigger
+
+object Streaming extends Serializable {
+
+  import org.apache.spark.sql.SparkSession
+  import org.apache.spark.sql.functions._
+
+  def main(arg: Array[String])={
+
+    val spark = SparkSession.builder()
+      .master("local[3]")
+      .appName("Streaming")
+      .config("spark.sql.shuffle.partitions",3)
+      .config("spark.sql.streaming.schemaInference",true)
+      .getOrCreate()
+
+    val jsonDF = spark.readStream
+      .format("json")
+      .option("path","/Users/nilan/Documents/Learning2025/AgainScala/SparkScala/untitled1/data/")
+      .load()
+
+    val explodeDF = jsonDF
+      .selectExpr("CashierID","CreatedTime","CustomerCardNo","CustomerType","DeliveryAddress.AddressLine","DeliveryAddress.City","DeliveryAddress.ContactNumber","DeliveryAddress.PinCode","DeliveryAddress.state","DeliveryType","explode(InvoiceLineItems) as LineItems")
+
+    explodeDF.printSchema()
+
+    val flattenedDF = explodeDF.withColumn("ItemCode",expr("LineItems.ItemCode"))
+    .withColumn("ItemDescription",expr("LineItems.ItemDescription"))
+    .withColumn("ItemPrice",expr("LineItems.ItemQty")).withColumn("TotalValue",expr("LineItems.TotalValue"))
+
+
+    val invoiceWriterQuery = flattenedDF
+      .writeStream.format("json")
+      .option("path","output")
+      .option("checkpointLocation","chk-point-dir")
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime("1 minute")).start()
+
+    invoiceWriterQuery.awaitTermination()
+
+
+
+
+
+  }
+
+}
