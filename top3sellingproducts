@@ -1,0 +1,32 @@
+object Streaming1 extends Serializable{
+
+  import org.apache.spark.sql.SparkSession
+  import org.apache.spark.sql.expressions.Window
+  import org.apache.spark.sql.functions._
+
+  """ You have sales data with product_id, region, and sales_amount.
+    | You need to find the top 3 best-selling products within each region. """.stripMargin
+  def main(args:Array[String])={
+    """ Each region --> partitionBy(region)
+      |productId desc """.stripMargin
+
+    val spark = SparkSession.builder().master("local[3]").appName("Top 3 selling products").getOrCreate()
+
+    import spark.implicits._
+    val salesDF = Seq(
+      ("A","East",100),
+      ("B","East",150),
+      ("C", "East", 80),
+      ("D", "West", 200),
+      ("E", "West", 120),
+      ("F", "West", 250)
+    ).toDF("product_id","region","sales_amount")
+
+    val windowSpec = Window.partitionBy("region").orderBy(col("sales_amount").desc)
+
+    val rankedssalesDF= salesDF.withColumn("rownumber1",row_number().over(windowSpec))
+
+    val Top3Products =rankedssalesDF.filter(col("rownumber1") <= 3).show()
+
+  }
+}
